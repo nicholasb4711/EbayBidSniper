@@ -8,6 +8,7 @@ import time
 import sys
 import logging
 from datetime import datetime
+from selenium.webdriver.common.keys import Keys
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -41,19 +42,32 @@ class EbayBidSniper:
             sys.exit(1)
 
     def login(self, username, password):
-        """Login to eBay"""
+        """Login to eBay via Google"""
         try:
             self.driver.get('https://www.ebay.com')
             self.wait_for_element(By.LINK_TEXT, 'Sign in').click()
             
-            username_field = self.wait_for_element(By.ID, 'userid')
-            username_field.send_keys(username)
+            # Click Google sign-in button
+            google_signin = self.wait_for_element(By.CSS_SELECTOR, '[data-signin-type="GOOGLE"]')
+            google_signin.click()
             
-            password_field = self.wait_for_element(By.ID, 'pass')
+            # Switch to Google login popup
+            windows = self.driver.window_handles
+            self.driver.switch_to.window(windows[-1])
+            
+            # Enter Google email
+            email_field = self.wait_for_element(By.CSS_SELECTOR, 'input[type="email"]')
+            email_field.send_keys(username)
+            email_field.send_keys(Keys.RETURN)
+            
+            # Enter Google password
+            password_field = self.wait_for_element(By.CSS_SELECTOR, 'input[type="password"]')
             password_field.send_keys(password)
+            password_field.send_keys(Keys.RETURN)
             
-            self.wait_for_element(By.ID, 'sgnBt').click()
-            logging.info("Successfully logged in")
+            # Switch back to main window
+            self.driver.switch_to.window(windows[0])
+            logging.info("Successfully logged in via Google")
             
         except Exception as e:
             logging.error(f"Login failed: {str(e)}")
@@ -110,13 +124,15 @@ class EbayBidSniper:
             sys.exit(1)
 
 if __name__ == "__main__":
-    # Configuration
-    TEST_ITEM_URL = "https://www.ebay.com/itm/some-low-price-item"  # Use a cheap item for testing
+    # Testing Configuration
+    TEST_MODE = True  # Set to False for real bidding
+    TEST_ITEM_URL = "https://www.ebay.com/itm/387804040918?_skw=lego&itmmeta=01JHGN15Z602QD4VDCKPMTD6XQ&hash=item5a4aec0ed6%3Ag%3AlioAAOSw5QlnfmE6&itmprp=enc%3AAQAJAAAAwHoV3kP08IDx%2BKZ9MfhVJKnk%2BBuDhFo7iVjk3uxeSRbYSj9Wa9rVP0UZkGbRO3%2FdTYjwusOhrLq2ExLY1LIfOqyIsyjhH%2Fan9JX2o72%2BD68Pm7FOlX4DMha1xlW%2B3Xzh4WFnhev0xNjjNSHlSKsFapF5l5iUj3Q%2FUuIZDXa2cjRnFf%2FfKDMZ3EC1%2FB4tsg0tLEFy9OdM9HZ0uXvUw6MKlR5pEMR71lEw11ZANjFk5SZZR1czflimkr%2BdGhntx%2B0o8Q%3D%3D%7Ctkp%3ABk9SR-jfhJWMZQ&LH_Auction=1"
     TEST_BID = "1.00"
     MINUTES_BEFORE_END = 0.1  # 6 seconds for testing
-    ITEM_URL = "https://www.ebay.com/itm/326401182642?_skw=power+meter+pedals&epid=20045602354&itmmeta=01JHGKGY2W56HFY9S0C2GNFR53&hash=item4bff06cbb2:g:pS4AAOSwaXpngZFU&itmprp=enc%3AAQAJAAAA8HoV3kP08IDx%2BKZ9MfhVJKnregXLyGe9q4DlJKAs5%2Bcz7d0nxgH2XlD2V2BTDgJ9iGCvKvqgkSWDHvqjbgJRP%2F%2Bg0wzus5zwWFJtai6%2FKIOwjbmhvOjnTwVzj4dEBT9Z7dTaEqiy4%2BtfNBFeuHd2LXNiiua3qFv4%2BUnkSMU2cZ0sSIwCgVTOgDDgrD2I%2BnKXDkF7lsLJJbj54BuUGRJjTaPrsQq74v6pDIczWgDBhF4vCJ7eRJ5O0ZbDBUkmZeDS4bYhncg6x2BU60UduajqHqi07GI1vIrU1jc8r5wUCEWSVyHAuX7xtFXqxdsRP6qzEg%3D%3D%7Ctkp%3ABk9SR9Dhw5OMZQ"
-    MAX_BID = "430.00"  # No dollar sign needed
-    MINUTES_BEFORE_END = 1
+    
+    # Production Configuration
+    ITEM_URL = "https://www.ebay.com/itm/326401182642"  # The eBay item you want to bid on
+    MAX_BID = "430.00"  # Your maximum bid amount
     
     # Check environment variables
     EBAY_USERNAME = os.getenv("EBAY_USERNAME")
@@ -127,5 +143,9 @@ if __name__ == "__main__":
         sys.exit(1)
     
     # Create and run sniper in test mode
-    sniper = EbayBidSniper(TEST_ITEM_URL, TEST_BID, MINUTES_BEFORE_END, test_mode=True)
-    sniper.run(EBAY_USERNAME, EBAY_PASSWORD)
+    if TEST_MODE:
+        sniper = EbayBidSniper(TEST_ITEM_URL, TEST_BID, MINUTES_BEFORE_END, test_mode=True)
+        sniper.run(EBAY_USERNAME, EBAY_PASSWORD)
+    else:
+        sniper = EbayBidSniper(ITEM_URL, MAX_BID, MINUTES_BEFORE_END, test_mode=False)
+        sniper.run(EBAY_USERNAME, EBAY_PASSWORD)
